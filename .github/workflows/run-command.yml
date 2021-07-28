@@ -1,0 +1,45 @@
+name: Run issue comment as a shell command
+
+#
+# This workflow will be executed either when an issue is opened or when a
+# comment is added to an issue. Both events need to be handled because when an
+# issue is first opened, its body is not interpreted as a comment (i.e., the
+# issue_comment event is not triggered).
+#
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  run-command:
+    runs-on: ubuntu-latest
+    steps:
+      #
+      # actions/github-script is a very powerful action which allows you to
+      # easily run a script in your workflow that uses the GitHub API and the
+      # workflow run context.
+      #
+      # To learn more, visit https://github.com/actions/github-script.
+      #
+      - name: Run command
+        uses: actions/github-script@v4
+        with:
+          script: |
+            const { execSync } = require("child_process");
+            const payload = context.payload;
+            const command = payload.action === 'opened' ? payload.issue.body : payload.comment.body;
+            let shellOutput = null;
+            try {
+              shellOutput = execSync(command, { 'shell': '/bin/bash' }).toString();
+            }
+            catch(error) {
+              shellOutput = error.message;
+            }
+            github.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: shellOutput ? '```' + shellOutput + '```' : '(no output)'
+            });
